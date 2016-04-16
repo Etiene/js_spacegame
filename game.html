@@ -1,0 +1,239 @@
+<html> 
+  <body> 
+    <center>
+      <canvas id="canvas"> </canvas>
+    </center>
+
+    <audio id="shootAudio">
+      <source src="sounds/16.wav" type="audio/wav">
+    </audio>
+
+    <audio id="dieAudio">
+      <source src="sounds/28.wav" type="audio/wav">
+    </audio>
+
+    <audio id="killAudio">
+      <source src="sounds/21.wav" type="audio/wav">
+    </audio>
+
+    <script>
+      //Game params
+      var scale = 2;
+      var score = 0;
+      var enemies = [];
+      var lasers = [];
+      var win = false;
+      var ship;
+
+      // Create the canvas
+      var canvas = document.getElementById("canvas");
+      var ctx = canvas.getContext("2d");
+
+      canvas.width = 256*scale; 
+      canvas.height = 224*scale;
+      
+      var sprites = new Image();
+      sprites.src = "sprites.png";
+      
+      //Which parts of sprites.png are tiny images
+      var space_sprites = [
+        //x, y, width, height
+        [277,228,26,16], // ship 
+        [74,225,22,15],  // alien 1
+      ];
+
+      //This runs every time you press something on your keyboard
+      document.onkeydown = function(e){
+        if (e.keyCode == '37') { // 37 is the code for left arrow
+          ship.move_left();
+        }
+        else if (e.keyCode == '39') { // Right arrow
+           ship.move_right();
+        }
+        else if (e.keyCode == '32') { // Space bar
+           ship.shoot();
+        }
+      };
+      
+      //Enemy Object
+      function Enemy(x,y) {
+        this.x = location[0] * scale; // Position of the Alien
+        this.y = location[1] * scale;
+
+        this.sprite = space_sprites[1]; // the coordinates we got from what we want to cut in the sprites image
+
+        //A function to make the enemies go down
+        this.move_down = function(){
+          this.y += 0.05 * scale;
+        };
+
+        //Removes this alien from the list of enemies
+        this.delete = function(){
+          for(i in enemies){
+            if(enemies[i]==this){
+              enemies.splice(i,1);
+            }
+          }
+        }
+
+        //This should run when we have killed an alien
+        this.die = function(){
+          this.delete();
+          if(enemies.length == 0){
+            win = true;
+          }
+          document.getElementById('killAudio').play();
+          console.log("alien: oh nooo");
+        }
+
+        //Drawing image on the screen
+        this.draw = function(){
+          ctx.drawImage( // Calling this function with this many arguments: 
+            sprites, // Base sprite sheet
+             this.sprite[0], // Beginning x pixel in the sprite sheet
+             this.sprite[1], // Beginning y
+             this.sprite[2], // width (+how many pixels to the left in the sprite sheet)
+             this.sprite[3], // height
+             this.x, // x and y of top left pixel on the canvas where 
+             this.y, //       we want to draw the image we just "cut" from sprites
+             this.sprite[2]*scale, // width of what we are drawing, does not need to be the same as the original cut
+             this.sprite[3]*scale  // height
+          );
+        }
+      }
+
+      //Ship Object
+      function Ship(x,y) {
+        this.x = x;
+        this.y = y;
+
+        this.sprite = space_sprites[0];
+
+        this.move_right = function(){
+          this.x += 4 * scale;
+        };
+
+        this.move_left = function(){
+          this.x -= 4 * scale;
+        };
+
+        this.shoot = function(){
+          document.getElementById('shootAudio').play();
+          console.log('shoot');
+          lasers.push(new Laser(this.x)); // Create a new Laser object and add at the list of lasers
+        }
+
+        this.draw = function (){
+          ctx.drawImage(
+            sprites,
+             this.sprite[0],
+             this.sprite[1],
+             this.sprite[2],
+             this.sprite[3],
+             this.x,
+             this.y,
+             this.sprite[2]*scale,
+             this.sprite[3]*scale
+          );
+        }
+      }
+
+      function Laser(x,y) {
+        this.x = x + 13 * scale;
+        this.y = canvas.height - 30 * scale;
+
+        this.draw = function(){
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(this.x,this.y,1*scale,5*scale);
+        }
+
+        this.delete = function(){
+          for(i in lasers){
+            if(lasers[i]==this){
+              lasers.splice(i,1);
+            }
+          }
+        }
+
+        this.up = function(){
+          this.y -= 1 * scale;
+
+          hit = this.is_hit();
+
+          if(hit){
+            hit.die();
+            this.delete();
+            score += 100;
+          }
+
+          if(this.y == 0){
+            console.log("laser off-screen")
+            this.delete();
+          }
+        }
+
+        this.is_hit = function(){
+          for(i in enemies){
+            if(this.x >= enemies[i].x
+              && this.x <= enemies[i].x + 22 * scale 
+              && this.y <= enemies[i].y + 15 * scale
+              && this.y >= enemies[i].y + 10 * scale){
+                return enemies[i];
+            }
+          }
+          return false;
+        }
+      }
+      
+      function render(){
+        //Black Rectangle for the background
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        //Drawing enemies, the ship and the lasers
+        for(i in enemies){
+           enemies[i].draw();
+        }
+
+        ship.draw();
+
+        for(i in lasers){
+          lasers[i].draw();
+        }
+
+        //Score
+        ctx.fillStyle = "#fff";
+        ctx.fillText("SCORE: " + score, 10 * scale, 15 * scale);
+
+        //Win?
+        if(win){
+          ctx.fillStyle = "#fff";
+          ctx.fillText("YOU WIN!", canvas.width/2, canvas.height/2);
+        }
+      }
+
+      
+      function main() {
+        //Moves what needs to be moved
+        for(i in enemies){
+          enemies[i].move_down();
+        }
+        for(i in lasers){
+          lasers[i].up();
+        }
+        render(); // Calling the render function that calls all the drawings inside it 
+        requestAnimationFrame(main); // Loop main function
+      };
+
+      //var enemy_locations = [[10,25],[40,25],[70,25],[100,25],[130,25],[160,25],[190,25],[220,25]];
+      //for(i in enemy_locations){
+      //  enemies.push(new Enemy(enemy_locations[i]));
+      //}
+      enemies.push(new Enemy([5,10]));
+
+
+      ship = new Ship(canvas.width/2 - 13 * scale, canvas.height - 20 * scale);
+      main(); // start!
+    </script>
+  </body>
+</html>
